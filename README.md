@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Task Manager
 
-## Getting Started
+A small task manager built with **Next.js 15** (App Router), **tRPC 11** and **TanStack Query**. Tasks are kept in memory on the server; there is no database.
 
-First, run the development server:
+## Running
+
+Requires Node.js 20 or newer (`.nvmrc` pins 22).
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The app starts with 30 sample tasks so the infinite scroll can be seen right away.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Other scripts: `npm run build`, `npm start`, `npm run lint`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+- List tasks with **server-side rendering**: the first page arrives in the HTML.
+- **Infinite scroll**: the next pages load as the user reaches the end of the list.
+- Create and edit tasks in a validated form.
+- Delete tasks from the list, with confirmation and success/error toasts.
+- Loading, empty, error and "end of list" states.
 
-To learn more about Next.js, take a look at the following resources:
+## How it works
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+  schemas/task.ts          Zod schema + Task type, shared by client and server
+  server/
+    task-store.ts          the in-memory array (the "database")
+    trpc.ts                tRPC setup and error formatting
+    routers/tasks.ts       list, byId, create, update, delete
+  trpc/
+    server.ts              helpers for Server Components (prefetch, direct calls)
+    client.tsx             React provider and the useTRPC hook
+  app/
+    api/trpc/[trpc]/       exposes the router over HTTP
+    page.tsx               task list (SSR)
+    tasks/new, tasks/[id]/edit
+  components/
+    task-list.tsx          infinite list + delete
+    task-form.tsx          create/edit form
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The browser never calls `fetch` by hand. Components use typed tRPC hooks, and the types come straight from the router, so a change in the server contract shows up as a TypeScript error in the UI.
 
-## Deploy on Vercel
+## Decisions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **One validation schema.** `taskInputSchema` validates the form in the browser (instant feedback) and the input on the server (the check that actually protects the data). The rules cannot drift apart.
+- **SSR through prefetch + hydration.** The home page is a Server Component that calls the router directly, puts the first page in the TanStack Query cache and sends that cache with the HTML. The client list starts from it and only uses the network for the next pages. The page is `force-dynamic` because the data changes on every mutation.
+- **Cursor pagination, not offset.** The cursor is the `dataCriacao` of the last task received. If a task is created or deleted while the user scrolls, no item is skipped or duplicated, which would happen with page numbers.
+- **Infinite scroll with `IntersectionObserver`.** An empty element after the list triggers the next page when it becomes visible. No scroll listeners and no extra library. If a page fails to load, observing stops and a "Try again" button is shown, so a failing request is not retried in a loop.
+- **Each row owns its delete mutation.** The "Deleting…" state belongs to a single row and several tasks can be deleted at once. After any delete attempt the list is refetched, so a row that was already removed elsewhere disappears.
+- **Meaningful errors.** Operations on a missing task return `NOT_FOUND` with a readable message; invalid input returns `BAD_REQUEST` with the validation messages in plain text instead of a raw issue dump. The UI shows these messages as they are.
+- **Plain `useState` in the form.** Two fields do not justify a form library.
+- **Dates are shown in UTC with a fixed locale**, so the server and the browser render identical text and there is no hydration mismatch.
+- **Field names** (`titulo`, `descricao`, `dataCriacao`) follow the challenge specification. Everything else is in English.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Limitations
+
+- Data is lost when the server restarts, as requested by the challenge.
+- The in-memory store assumes a single server process. On serverless or multi-instance hosting each instance would have its own list; a real deployment would need a database.
+- There are no automated tests; the flows were verified manually.
