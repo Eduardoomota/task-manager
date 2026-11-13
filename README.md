@@ -33,7 +33,7 @@ src/
     trpc.ts                tRPC setup and error formatting
     routers/tasks.ts       list, byId, create, update, delete
   trpc/
-    server.ts              helpers for Server Components (prefetch, direct calls)
+    server.ts              tRPC client for Server Components (prefetch)
     client.tsx             React provider and the useTRPC hook
   app/
     api/trpc/[trpc]/       exposes the router over HTTP
@@ -49,7 +49,7 @@ The browser never calls `fetch` by hand. Components use typed tRPC hooks, and th
 ## Decisions
 
 - **One validation schema.** `taskInputSchema` validates the form in the browser (instant feedback) and the input on the server (the check that actually protects the data). The rules cannot drift apart.
-- **SSR through prefetch + hydration.** The home page is a Server Component that calls the router directly, puts the first page in the TanStack Query cache and sends that cache with the HTML. The client list starts from it and only uses the network for the next pages. The page is `force-dynamic` because the data changes on every mutation.
+- **SSR through prefetch + hydration.** The home page is a Server Component that fetches the first page through the tRPC API, puts it in the TanStack Query cache and sends that cache with the HTML. The client list starts from it and only uses the network for the next pages. The page is `force-dynamic` because the data changes on every mutation.
 - **Cursor pagination, not offset.** The cursor is the `dataCriacao` of the last task received. If a task is created or deleted while the user scrolls, no item is skipped or duplicated, which would happen with page numbers.
 - **Infinite scroll with `IntersectionObserver`.** An empty element after the list triggers the next page when it becomes visible. No scroll listeners and no extra library. If a page fails to load, observing stops and a "Try again" button is shown, so a failing request is not retried in a loop.
 - **Each row owns its delete mutation.** The "Deleting…" state belongs to a single row and several tasks can be deleted at once. After any delete attempt the list is refetched, so a row that was already removed elsewhere disappears.
@@ -60,7 +60,11 @@ The browser never calls `fetch` by hand. Components use typed tRPC hooks, and th
 
 ## Deployment
 
-Because tasks live in memory, the app has to run as one long-lived Node process (`npm run build && npm start`). `render.yaml` describes that setup for Render. Serverless platforms are not a fit: pages and API routes run in separate instances that do not share memory.
+Live demo: https://task-manager-five-ashy-56.vercel.app
+
+The demo runs on Vercel, where each page and the API route are separate serverless functions with separate memory. For that reason Server Components do not read the task array directly: they go through the tRPC HTTP API (`src/trpc/server.ts`), so the API route is the only owner of the data and every read and write sees the same list.
+
+In-memory data on serverless is still best effort: the list resets to the sample tasks when the function goes cold, and consistency is not guaranteed if the platform runs more than one instance of the API. Running `npm run build && npm start` as a single Node process has neither issue.
 
 ## Limitations
 

@@ -29,7 +29,8 @@ const SAMPLE_TITLES = [
 function seed(): Task[] {
   const now = Date.now();
   return Array.from({ length: 30 }, (_, index) => ({
-    id: crypto.randomUUID(),
+    // Fixed ids: every server instance starts with the same sample tasks.
+    id: `seed-${30 - index}`,
     titulo: `${SAMPLE_TITLES[index % SAMPLE_TITLES.length]} #${30 - index}`,
     descricao: index % 3 === 0 ? "Sample task created on startup." : undefined,
     dataCriacao: now - (index + 1) * HOUR,
