@@ -1,0 +1,13 @@
+# Render blueprint. The app keeps tasks in memory, so it must run as a single
+# long-lived Node process (not on serverless functions).
+services:
+  - type: web
+    name: task-manager
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22

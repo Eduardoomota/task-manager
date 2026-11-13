@@ -58,6 +58,10 @@ The browser never calls `fetch` by hand. Components use typed tRPC hooks, and th
 - **Dates are shown in UTC with a fixed locale**, so the server and the browser render identical text and there is no hydration mismatch.
 - **Field names** (`titulo`, `descricao`, `dataCriacao`) follow the challenge specification. Everything else is in English.
 
+## Deployment
+
+Because tasks live in memory, the app has to run as one long-lived Node process (`npm run build && npm start`). `render.yaml` describes that setup for Render. Serverless platforms are not a fit: pages and API routes run in separate instances that do not share memory.
+
 ## Limitations
 
 - Data is lost when the server restarts, as requested by the challenge.
