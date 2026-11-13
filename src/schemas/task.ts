@@ -9,7 +9,8 @@ import { z } from "zod";
  */
 export const taskInputSchema = z.object({
   titulo: z
-    .string()
+    // Also covers a missing or non-string field, not only an empty one.
+    .string({ error: "Title is required" })
     .trim()
     .min(1, "Title is required")
     .max(120, "Title must be at most 120 characters"),
